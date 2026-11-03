@@ -1,0 +1,355 @@
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,provide=*]{babel}
+\usepackage{lmodern,textcomp}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx,microtype,booktabs,tabularx}
+\usepackage{listings,xcolor,caption,fancyhdr,needspace}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\setlength{\headheight}{14pt}
+\setlength{\emergencystretch}{1.5em}
+\renewcommand{\arraystretch}{1.15}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small ICN-292 -- Sistemas de Información para la Gestión}
+\fancyhead[R]{\small Laboratorio 4}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\captionsetup{font=footnotesize,labelfont=bf,skip=3pt,hypcap=false}
+\addto\captionsspanish{\renewcommand{\tablename}{Tabla}}
+
+\lstset{
+  language=SQL,
+  basicstyle=\ttfamily\fontsize{8.5}{10}\selectfont,
+  keywordstyle=\color{black},
+  stringstyle=\color{black},
+  commentstyle=\color{black},
+  showstringspaces=false,
+  upquote=true,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  tabsize=4,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{black!25},
+  backgroundcolor=\color{black!2},
+  framesep=5pt,
+  xleftmargin=5pt,
+  xrightmargin=5pt,
+  aboveskip=5pt,
+  belowskip=5pt,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1
+           {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1
+}
+
+\newcommand{\resultado}[3]{%
+  \par\smallskip\noindent
+  \begin{minipage}[t]{.69\linewidth}
+    \vspace{0pt}#1
+  \end{minipage}\hfill
+  \begin{minipage}[t]{.28\linewidth}
+    \vspace{0pt}\centering
+    \includegraphics[width=\linewidth,height=3cm,keepaspectratio]{#2}
+    \captionof{figure}{#3}
+  \end{minipage}\par\medskip
+}
+
+
+\newcommand{\evidencia}[3]{%
+  \begin{minipage}[t]{#1\linewidth}
+    \vspace{0pt}\centering
+    \includegraphics[width=\linewidth,height=3cm,keepaspectratio]{#2}
+    \captionof{figure}{#3}
+  \end{minipage}%
+}
+\newcommand{\consulta}[1]{\Needspace{20\baselineskip}\subsection{#1}}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Laboratorio 4: Base de datos de Austral Editores\par}
+  \vspace{0.25cm}
+  {ICN-292 -- Sistemas de Información para la Gestión\par}
+  {Universidad Técnica Federico Santa María\par}
+  \vspace{0.35cm}
+  {Anesti Papasideris\par}
+  {Rol: 202160575-4\par}
+  {Segundo semestre de 2026\par}
+  \vspace{0.35cm}
+  {\small\textbf{Repositorio GitHub}\par}
+  {\footnotesize\url{https://github.com/AnestiPapasideris/ICN292-Lab4-Papasideris-Anesti}\par}
+\end{center}
+
+\section*{Resumen ejecutivo}
+
+En este laboratorio se reconstruyó la base de datos de Austral Editores, una editorial que perdió parte de sus tablas y relaciones por un error al ejecutar un script. El trabajo se realizó en MySQL 8 mediante MySQL Workbench. Se crearon las tablas de autores, libros, colecciones y pagos, se cargaron los seis autores y los doce libros del enunciado y se ejecutaron las diez consultas solicitadas.
+
+La revisión del catálogo inicial entregó un total de \textbf{24.250 ejemplares vendidos}, un promedio de \textbf{217,9167 páginas} por libro y 2022 como el año de publicación más antiguo. El libro con más ejemplares vendidos es \textit{El Barrio de Lila}, con 5.000. Al revisar solamente las publicaciones de 2024, Elena Pizarro y Valentina Correa tienen dos libros cada una. Para los autores sin país registrado se consideró expresamente el valor \texttt{NULL}, de manera que Kenji Arakawa apareciera en la consulta correspondiente.
+
+También se comprobaron operaciones que modifican los datos. Se insertó y luego eliminó \textit{Papel Mojado}, verificando la existencia del registro antes del borrado y su ausencia después. En \textit{Cielo de Enero} se aplicó un aumento de 100 ejemplares vendidos, desde 1.500 hasta 1.600, usando el mismo filtro en la consulta previa, la actualización y la consulta posterior.
+
+Para probar las relaciones reconstruidas se agregaron dos colecciones y tres pagos. Los doce libros quedaron asociados a una colección: ocho a \textit{Narrativa Austral} y cuatro a \textit{Voces y Ensayos}. Los pagos de prueba sumaron 400.000 para Elena Pizarro y 100.000 para Rodrigo Bahamonde. Estos registros permitieron comprobar las uniones entre tablas y el cálculo de totales por autor.
+
+El desarrollo presenta el criterio de cada consulta, el código ejecutado y su resultado. Las capturas se incluyen en tamaño reducido como respaldo de la ejecución. Los resultados del catálogo inicial se distinguen de los obtenidos después de las modificaciones, ya que una consulta puede estar bien escrita y aun así entregar otro valor si la base cambió antes de ejecutarla.
+
+\newpage
+\section{Contexto y objetivo del trabajo}
+
+El problema de Austral Editores requiere recuperar tanto las tablas como los vínculos entre ellas. Guardar los libros sin su relación con el autor dejaría incompleta la información de la editorial. Lo mismo ocurre con las colecciones y los pagos: las consultas finales necesitan identificar a qué colección pertenece un libro y a qué autor corresponde cada pago.
+
+El objetivo fue dejar una base que pudiera crearse desde cero y utilizarla para responder preguntas sobre el catálogo, sus autores y los movimientos de prueba. El script reúne la creación de la base, la carga de datos y las consultas en el orden de ejecución. El informe explica los resultados obtenidos y las comprobaciones realizadas en los cambios de registros.
+
+\section{Reconstrucción de la base y orden de ejecución}
+
+La base se creó con el nombre \texttt{austral}. Primero se definieron las cuatro tablas y sus claves; después se insertó la carga oficial. Las claves primarias son enteros con \texttt{AUTO\_INCREMENT}, por lo que sus valores se asignan según el orden de inserción. La estructura utilizada se resume en la tabla siguiente.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+\textbf{Tabla} & \textbf{Clave primaria} & \textbf{Contenido y relación} \\
+\midrule
+\texttt{autores} & \texttt{id\_autor} & Nombre, país y género del autor. \\
+\texttt{libros} & \texttt{id\_libro} & Título, páginas, ventas y año; referencia al autor y, cuando corresponde, a una colección. \\
+\texttt{colecciones} & \texttt{id\_coleccion} & Título y fecha de publicación de la colección. \\
+\texttt{pagos} & \texttt{id\_pago} & Autor que recibe el pago, fecha y monto. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Un autor puede tener varios libros y varios pagos, mientras cada libro y cada pago se relacionan con un solo autor. Una colección puede reunir varios libros. El campo \texttt{id\_coleccion} permite \texttt{NULL}, porque la carga inicial todavía no asigna colecciones. Estas relaciones se definieron con claves foráneas y se revisaron en el modelo obtenido mediante \textit{Reverse Engineer} de Workbench.
+
+Se utilizó \texttt{DATE} para las fechas y \texttt{DECIMAL(10,2)} para los montos. El género se definió como \texttt{ENUM} con los cinco valores permitidos. En el caso de Kenji Arakawa, el país se cargó como \texttt{NULL}; además, se mantuvo su registro aunque no tenga libros asociados.
+
+Las consultas 1 a 6 se ejecutaron sobre los doce libros originales. Luego se realizaron la inserción y eliminación de la consulta 7 y el aumento de ventas de la consulta 8. Al final se cargaron las colecciones y los pagos necesarios para las consultas 9 y 10. Estos últimos son datos de prueba: sus resultados sirven para revisar las relaciones, sin representar movimientos reales de la editorial.
+
+\Needspace{24\baselineskip}
+\section{Consultas sobre el catálogo inicial}
+
+\consulta{Consulta 1: autores con país distinto de Chile o sin país}
+
+Se seleccionaron los autores cuyo país es distinto de Chile, incluyendo a quienes no tienen ese dato registrado. La condición \texttt{OR pais IS NULL} permite incorporar a Kenji Arakawa. El ordenamiento por nombre facilita revisar el listado.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT nombre, genero
+FROM autores
+WHERE pais <> 'Chile' OR pais IS NULL
+ORDER BY nombre;
+\end{lstlisting}
+\end{minipage}\par
+
+\textbf{Comparación solicitada:} \texttt{pais <> 'Chile'} devuelve \texttt{TRUE} para otro país, \texttt{FALSE} para Chile y \texttt{UNKNOWN} con \texttt{NULL}, porque el país es desconocido.
+
+\resultado{El resultado contiene cuatro autores: Harold Finch, Kenji Arakawa, Nora Keller y Valentina Correa, con sus respectivos géneros. Elena Pizarro y Rodrigo Bahamonde quedan fuera porque tienen Chile registrado. Usar solamente la comparación con Chile también dejaría fuera a Kenji, ya que \texttt{WHERE} conserva las filas cuya condición es verdadera.}{Consulta1.png.png}{Autores seleccionados.}
+
+\consulta{Consulta 2: libros entre 190 y 220 páginas}
+
+Para delimitar la extensión de los libros se utilizó \texttt{BETWEEN}, que incluye ambos extremos. Por lo tanto, también deben aparecer los títulos de 190 y 220 páginas. La salida se ordenó de menor a mayor cantidad de páginas.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT titulo, paginas
+FROM libros
+WHERE paginas BETWEEN 190 AND 220
+ORDER BY paginas;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{Se obtuvieron siete libros: \textit{El Barrio de Lila} (190), \textit{Flor de Hierro} (195), \textit{El Norte} (200), \textit{Antes del Amanecer} (205), \textit{Cielo de Enero} (210), \textit{Máquinas} (215) y \textit{Hora Dorada} (220). La presencia del primero y del último confirma que el rango incluye los límites pedidos.}{Consulta2.png.png}{Libros dentro del rango.}
+
+\consulta{Consulta 3: resumen estadístico del catálogo}
+
+Se calcularon cinco medidas en una sola fila. \texttt{COUNT} cuenta los libros, \texttt{SUM} suma sus ejemplares vendidos y \texttt{AVG} obtiene el promedio de páginas. Las funciones \texttt{MIN} y \texttt{MAX} se aplicaron al año y a las ventas, respectivamente. Cada resultado tiene un alias para identificarlo en la salida.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT COUNT(*) AS cantidad_libros,
+    SUM(ejemplares_vendidos) AS total_ejemplares_vendidos,
+    AVG(paginas) AS promedio_paginas,
+    MIN(anio) AS anio_mas_antiguo,
+    MAX(ejemplares_vendidos) AS mayor_venta_de_un_libro
+FROM libros;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{El catálogo tiene \textbf{12 libros} y acumula \textbf{24.250 ejemplares vendidos}. El promedio es \textbf{217,9167 páginas}; el año más antiguo es \textbf{2022} y la mayor venta de un libro es \textbf{5.000 ejemplares}. La suma coincide con el total del enunciado y permite comprobar que esta consulta se ejecutó sobre la carga inicial.}{Consulta3.png.png}{Medidas del catálogo inicial.}
+
+\consulta{Consulta 4: géneros distintos}
+
+Se usó \texttt{DISTINCT} para mostrar cada género una sola vez. Esto evita que Novela aparezca dos veces por estar asociada a dos autores. El campo \texttt{ENUM} se declaró en el orden indicado en el enunciado, que coincide con el orden alfabético requerido en esta consulta.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT DISTINCT genero
+FROM autores
+ORDER BY genero;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{La consulta devuelve cinco géneros: Cómic, Ensayo, Infantil, Novela y Poesía. Este listado resume las categorías presentes en los autores; no corresponde a una cuenta de libros por género. Por eso también aparece Cómic, aunque Kenji Arakawa no tenga libros en la carga oficial.}{Consulta4.png.png}{Géneros sin repeticiones.}
+
+\consulta{Consulta 5: autores con más de un libro en 2024}
+
+Se unieron autores y libros mediante \texttt{id\_autor}. Primero se filtraron los libros de 2024 con \texttt{WHERE}; después se agruparon por autor y se contaron. La condición \texttt{HAVING COUNT(*) > 1} se aplica al resultado de cada grupo, por lo que deja solamente a quienes tienen al menos dos publicaciones en ese año.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT a.nombre, COUNT(*) AS libros_publicados_2024
+FROM autores a
+JOIN libros l ON a.id_autor = l.id_autor
+WHERE l.anio = 2024
+GROUP BY a.id_autor, a.nombre
+HAVING COUNT(*) > 1
+ORDER BY a.nombre;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{Elena Pizarro y Valentina Correa tienen dos libros de 2024 cada una. Elena aparece por \textit{Cielo de Enero} y \textit{El Norte}; Valentina, por \textit{El Barrio de Lila} y \textit{Antes del Amanecer}. Los otros autores no alcanzan la cantidad solicitada. La consulta mide publicaciones, no ejemplares vendidos.}{Consulta5.png.png}{Autores y publicaciones de 2024.}
+
+\consulta{Consulta 6: tres títulos de 2024 con mayores ventas}
+
+Se combinaron las condiciones de año y ventas con \texttt{AND}. Luego se ordenó de mayor a menor y se limitó la salida a tres registros. El orden de estas operaciones permite obtener los primeros puestos entre los títulos que cumplen el filtro.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT titulo, ejemplares_vendidos
+FROM libros
+WHERE anio = 2024 AND ejemplares_vendidos > 2000
+ORDER BY ejemplares_vendidos DESC
+LIMIT 3;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{Los tres títulos son \textit{El Barrio de Lila}, con 5.000 ejemplares; \textit{Flor de Hierro}, con 4.100; y \textit{Antes del Amanecer}, con 2.700. \textit{El Norte} también supera los 2.000 ejemplares en 2024, con 2.200, pero queda fuera por el límite de tres filas. El resultado corresponde a ventas acumuladas de esos libros, sin permitir evaluar su rentabilidad.}{Consulta6.png.png}{Primeros tres títulos por ventas.}
+
+\Needspace{24\baselineskip}
+\section{Modificaciones y comprobación de registros}
+
+Las dos consultas siguientes cambian el contenido de la base. Para comprobar el efecto se revisó el registro antes y después de la operación. Se incluyó el identificador junto al título en los filtros, manteniendo el mismo criterio en cada verificación.
+
+\consulta{Consulta 7: inserción y eliminación de Papel Mojado}
+
+Se insertó \textit{Papel Mojado} para Rodrigo Bahamonde, cuyo identificador es 3. El registro tiene 260 páginas, 50 ejemplares vendidos y año 2024. Como no se indicó una colección, ese campo quedó en \texttt{NULL}. El identificador del libro fue asignado automáticamente como 13 en esta ejecución.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+INSERT INTO libros
+    (id_autor, titulo, paginas, ejemplares_vendidos, anio)
+VALUES
+    (3, 'Papel Mojado', 260, 50, 2024);
+SELECT *
+FROM libros
+WHERE titulo = 'Papel Mojado' AND id_libro = 13;
+\end{lstlisting}
+\end{minipage}\par
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+DELETE FROM libros
+WHERE titulo = 'Papel Mojado' AND id_libro = 13;
+SELECT *
+FROM libros
+WHERE titulo = 'Papel Mojado' AND id_libro = 13;
+\end{lstlisting}
+\end{minipage}\par
+
+La consulta previa muestra la fila que se eliminará. Después del \texttt{DELETE}, el mismo \texttt{SELECT} devuelve una tabla vacía: en este caso es el resultado esperado, porque confirma que el registro ya no existe. Al terminar, el catálogo vuelve a tener doce libros.
+
+\begin{center}
+\evidencia{.44}{Consulta7_antes.png.png}{Papel Mojado antes del borrado.}\hfill
+\evidencia{.44}{Consulta7_despues.png.png}{Consulta posterior sin registros.}
+\end{center}
+
+\consulta{Consulta 8: aumento de ventas de Cielo de Enero}
+
+Se aumentaron en 100 los ejemplares vendidos de \textit{Cielo de Enero}. La expresión suma al valor existente, por lo que la actualización debe ejecutarse una sola vez para obtener el cambio solicitado. Se mantuvo el filtro por título e identificador en las tres instrucciones.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT titulo, ejemplares_vendidos
+FROM libros
+WHERE titulo = 'Cielo de Enero' AND id_libro = 1;
+UPDATE libros
+SET ejemplares_vendidos = ejemplares_vendidos + 100
+WHERE titulo = 'Cielo de Enero' AND id_libro = 1;
+SELECT titulo, ejemplares_vendidos
+FROM libros
+WHERE titulo = 'Cielo de Enero' AND id_libro = 1;
+\end{lstlisting}
+\end{minipage}\par
+
+El valor previo es 1.500 y el valor posterior es 1.600. La diferencia de 100 confirma el incremento. Esta modificación no agrega libros ni cambia sus páginas, pero sí eleva la suma del catálogo a 24.350 ejemplares. Por esa razón, el total inicial de la consulta 3 debe comprobarse antes de realizar esta actualización.
+
+\begin{center}
+\evidencia{.30}{Consulta8_antes.png.png}{SELECT previo: 1.500.}\hfill
+\evidencia{.30}{Consulta8_update.png.png}{Ejecución del UPDATE.}\hfill
+\evidencia{.30}{Consulta8_despues.png.png}{SELECT posterior: 1.600.}
+\end{center}
+
+\Needspace{24\baselineskip}
+\section{Consultas con colecciones y pagos}
+
+\consulta{Consulta 9: libros y sus colecciones}
+
+La carga oficial no incluye colecciones. Para probar la relación se crearon \textit{Narrativa Austral}, con fecha 15 de enero de 2024, y \textit{Voces y Ensayos}, con fecha 10 de febrero de 2024. Después se asignaron los doce libros a estas dos colecciones y se realizó una unión para mostrar el título del libro junto al título y la fecha de su colección.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+INSERT INTO colecciones (titulo, fecha_publicacion) VALUES
+('Narrativa Austral', '2024-01-15'),
+('Voces y Ensayos', '2024-02-10');
+UPDATE libros
+SET id_coleccion = 1
+WHERE id_libro IN (1, 2, 3, 8, 9, 10, 11, 12);
+UPDATE libros
+SET id_coleccion = 2
+WHERE id_libro IN (4, 5, 6, 7);
+SELECT l.titulo AS titulo_libro,
+    c.titulo AS titulo_coleccion,
+    c.fecha_publicacion
+FROM libros l
+JOIN colecciones c ON l.id_coleccion = c.id_coleccion
+ORDER BY l.id_libro;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{La salida contiene doce filas: ocho corresponden a \textit{Narrativa Austral} y cuatro a \textit{Voces y Ensayos}. Como todos los libros fueron asignados, todos aparecen en el \texttt{JOIN}. La fecha mostrada pertenece a la colección, no a cada libro. Así se comprueba que la información se obtiene desde las dos tablas mediante \texttt{id\_coleccion}.}{Consulta9.png.png}{Libros asociados a colecciones.}
+
+\consulta{Consulta 10: detalle de pagos y total por autor}
+
+Se insertaron tres pagos de prueba: dos para Elena Pizarro, de 150.000 y 250.000, y uno para Rodrigo Bahamonde, de 100.000. Primero se consultó el detalle, uniendo cada pago con el nombre del autor y ordenando por fecha e identificador. Esto permite revisar los movimientos antes de sumarlos.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+INSERT INTO pagos (id_autor, fecha_pago, monto) VALUES
+(1, '2024-03-15', 150000.00),
+(1, '2024-06-15', 250000.00),
+(3, '2024-06-20', 100000.00);
+SELECT a.nombre AS autor, p.fecha_pago, p.monto
+FROM pagos p
+JOIN autores a ON p.id_autor = a.id_autor
+ORDER BY p.fecha_pago, p.id_pago;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{El detalle muestra tres pagos: Elena Pizarro recibe 150.000 el 15 de marzo y 250.000 el 15 de junio; Rodrigo Bahamonde recibe 100.000 el 20 de junio. Cada fila corresponde a un pago, por lo que el nombre de Elena aparece dos veces.}{Consulta10_pagos.png.png}{Detalle de los tres pagos.}
+
+Para obtener el total se agruparon los registros por autor y se aplicó \texttt{SUM(monto)}. El resultado pasa de una fila por pago a una fila por autor con pagos registrados.
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+SELECT a.nombre AS autor, SUM(p.monto) AS total_pagado
+FROM autores a
+JOIN pagos p ON a.id_autor = p.id_autor
+GROUP BY a.id_autor, a.nombre
+ORDER BY a.nombre;
+\end{lstlisting}
+\end{minipage}\par
+
+\resultado{El total de Elena Pizarro es \textbf{400.000} y el de Rodrigo Bahamonde es \textbf{100.000}. Ambos suman 500.000, igual que los tres movimientos del detalle. Los demás autores no aparecen porque el \texttt{JOIN} utilizado requiere pagos asociados; esta consulta no genera filas con total cero para ellos.}{Consulta10_totales.png.png}{Total pagado por autor.}
+
+\Needspace{14\baselineskip}
+\section{Conclusión}
+
+La reconstrucción permitió consultar el catálogo y relacionar los libros con sus autores y colecciones, además de registrar pagos por autor. Sobre la carga inicial se verificaron los doce libros y los 24.250 ejemplares vendidos. También se comprobó que los filtros, agrupaciones y uniones responden a preguntas distintas: seleccionar libros por extensión, contar publicaciones por autor o sumar pagos no requiere tratar los registros de la misma manera.
+
+Las modificaciones mostraron por qué es necesario revisar el estado de la base antes de interpretar un resultado. Una tabla vacía después del borrado de \textit{Papel Mojado} confirma la eliminación; en cambio, el aumento de \textit{Cielo de Enero} se comprueba comparando 1.500 con 1.600. Ejecutar de nuevo un \texttt{UPDATE} que suma al valor anterior o repetir un \texttt{INSERT} de pagos puede cambiar los totales, aunque las instrucciones no presenten errores de sintaxis.
+
+En las pruebas finales, las doce asociaciones a colecciones y la coincidencia entre el detalle de pagos y sus totales permitieron revisar las relaciones reconstruidas. El script conserva la secuencia de creación, carga y consultas, mientras las capturas respaldan los resultados presentados en el informe.
+
+\end{document}
